@@ -1,18 +1,22 @@
+import { randomBytes } from 'crypto';
 import { Request, Response } from 'express';
 import { RoomSession } from '../models/RoomSession';
 import { Quiz } from '../models/Quiz';
+import { catchAsync } from '../utils/catchAsync';
 
 // ---------------------------------------------------------------------------
-// Helper
+// Helper — F-07: cryptographically secure room code
 // ---------------------------------------------------------------------------
+
+/** Generates a 6-character uppercase hex code using crypto.randomBytes. */
 const generateRoomCode = (): string =>
-  Math.random().toString(36).substring(2, 8).toUpperCase();
+  randomBytes(3).toString('hex').toUpperCase();
 
 // ---------------------------------------------------------------------------
 // Controllers
 // ---------------------------------------------------------------------------
 
-export const createRoom = async (req: Request, res: Response): Promise<void> => {
+export const createRoom = catchAsync(async (req: Request, res: Response) => {
   const { quizId, mode } = req.body as { quizId: string; mode?: string };
 
   const quiz = await Quiz.findById(quizId);
@@ -32,9 +36,9 @@ export const createRoom = async (req: Request, res: Response): Promise<void> => 
   });
 
   res.status(201).json({ success: true, data: room });
-};
+});
 
-export const getRoomByCode = async (req: Request, res: Response): Promise<void> => {
+export const getRoomByCode = catchAsync(async (req: Request, res: Response) => {
   const room = await RoomSession.findOne({ code: req.params.code }).populate(
     'quizId',
     'title description totalPoints'
@@ -46,9 +50,9 @@ export const getRoomByCode = async (req: Request, res: Response): Promise<void> 
   }
 
   res.json({ success: true, data: room });
-};
+});
 
-export const joinRoom = async (req: Request, res: Response): Promise<void> => {
+export const joinRoom = catchAsync(async (req: Request, res: Response) => {
   const room = await RoomSession.findOne({ code: req.params.code });
 
   if (!room) {
@@ -77,9 +81,9 @@ export const joinRoom = async (req: Request, res: Response): Promise<void> => {
   }
 
   res.json({ success: true, data: room });
-};
+});
 
-export const updateRoomStatus = async (req: Request, res: Response): Promise<void> => {
+export const updateRoomStatus = catchAsync(async (req: Request, res: Response) => {
   const room = await RoomSession.findById(req.params.roomId);
 
   if (!room) {
@@ -104,4 +108,4 @@ export const updateRoomStatus = async (req: Request, res: Response): Promise<voi
 
   await room.save();
   res.json({ success: true, data: room });
-};
+});

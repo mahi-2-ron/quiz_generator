@@ -1,5 +1,15 @@
 import mongoose from 'mongoose';
 
+// ---------------------------------------------------------------------------
+// F-12: Concrete settings interface — replaces mongoose.Schema.Types.Mixed
+// ---------------------------------------------------------------------------
+export interface IRoomSettings {
+  showLeaderboard: boolean;
+  allowLateJoin: boolean;
+  shuffleQuestions: boolean;
+  shuffleOptions: boolean;
+}
+
 export interface IParticipantSnapshot {
   userId: mongoose.Types.ObjectId;
   name: string;
@@ -19,7 +29,7 @@ export interface IRoomSession extends mongoose.Document {
   startedAt?: Date;
   endedAt?: Date;
   participants: IParticipantSnapshot[];
-  settings?: any;
+  settings: IRoomSettings;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +43,17 @@ const participantSchema = new mongoose.Schema<IParticipantSnapshot>({
   score: { type: Number, default: 0 },
 });
 
+// F-12: Typed sub-schema replaces Schema.Types.Mixed
+const settingsSchema = new mongoose.Schema<IRoomSettings>(
+  {
+    showLeaderboard: { type: Boolean, default: true },
+    allowLateJoin: { type: Boolean, default: false },
+    shuffleQuestions: { type: Boolean, default: false },
+    shuffleOptions: { type: Boolean, default: false },
+  },
+  { _id: false } // embedded sub-doc, no separate _id needed
+);
+
 const roomSessionSchema = new mongoose.Schema<IRoomSession>(
   {
     code: { type: String, required: true, unique: true },
@@ -44,7 +65,7 @@ const roomSessionSchema = new mongoose.Schema<IRoomSession>(
     startedAt: { type: Date },
     endedAt: { type: Date },
     participants: [participantSchema],
-    settings: { type: mongoose.Schema.Types.Mixed },
+    settings: { type: settingsSchema, default: () => ({}) },
   },
   { timestamps: true }
 );

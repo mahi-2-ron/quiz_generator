@@ -59,7 +59,10 @@ export default function LiveRoomStudent() {
         const room = roomRes.data.data;
         setRoomState(room);
 
-        const socket = io(SOCKET_URL, { withCredentials: true });
+        const socket = io(SOCKET_URL, {
+          auth: { token: useAuthStore.getState().token },
+          withCredentials: true,
+        });
         socketRef.current = socket;
 
         socket.on('connect', () => {

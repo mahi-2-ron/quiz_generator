@@ -1,17 +1,30 @@
 import { Request, Response } from 'express';
 import { Quiz } from '../models/Quiz';
+import { catchAsync } from '../utils/catchAsync';
+import type { UpdateQuizBody } from '../schemas/quiz.schema';
 
 // ---------------------------------------------------------------------------
-// Helper — ownership check
+// Helper
 // ---------------------------------------------------------------------------
+
 const isOwner = (resourceCreatedBy: unknown, userId: unknown): boolean =>
   String(resourceCreatedBy) === String(userId);
+
+/** Permitted fields for update — explicitly excludes createdBy, status, totalPoints (F-05) */
+const pickUpdateFields = (body: UpdateQuizBody) => ({
+  ...(body.title !== undefined && { title: body.title }),
+  ...(body.description !== undefined && { description: body.description }),
+  ...(body.category !== undefined && { category: body.category }),
+  ...(body.difficulty !== undefined && { difficulty: body.difficulty }),
+  ...(body.timerSeconds !== undefined && { timerSeconds: body.timerSeconds }),
+  ...(body.questions !== undefined && { questions: body.questions }),
+});
 
 // ---------------------------------------------------------------------------
 // Controllers
 // ---------------------------------------------------------------------------
 
-export const createQuiz = async (req: Request, res: Response): Promise<void> => {
+export const createQuiz = catchAsync(async (req: Request, res: Response) => {
   const { title, description, category, difficulty, timerSeconds, questions } = req.body;
 
   const quiz = await Quiz.create({
@@ -26,14 +39,14 @@ export const createQuiz = async (req: Request, res: Response): Promise<void> => 
   });
 
   res.status(201).json({ success: true, data: quiz });
-};
+});
 
-export const getQuizzes = async (req: Request, res: Response): Promise<void> => {
+export const getQuizzes = catchAsync(async (req: Request, res: Response) => {
   const quizzes = await Quiz.find({ createdBy: req.user!._id }).sort({ createdAt: -1 });
   res.json({ success: true, data: quizzes });
-};
+});
 
-export const getQuizById = async (req: Request, res: Response): Promise<void> => {
+export const getQuizById = catchAsync(async (req: Request, res: Response) => {
   const quiz = await Quiz.findById(req.params.quizId);
 
   if (!quiz) {
@@ -47,9 +60,13 @@ export const getQuizById = async (req: Request, res: Response): Promise<void> =>
   }
 
   res.json({ success: true, data: quiz });
-};
+});
 
-export const updateQuiz = async (req: Request, res: Response): Promise<void> => {
+/**
+ * PATCH /quizzes/:quizId
+ * F-05: Only permitted fields are applied — never Object.assign(quiz, req.body).
+ */
+export const updateQuiz = catchAsync(async (req: Request, res: Response) => {
   const quiz = await Quiz.findById(req.params.quizId);
 
   if (!quiz) {
@@ -62,13 +79,14 @@ export const updateQuiz = async (req: Request, res: Response): Promise<void> => 
     return;
   }
 
-  Object.assign(quiz, req.body);
+  const safeFields = pickUpdateFields(req.body as UpdateQuizBody);
+  Object.assign(quiz, safeFields);
   await quiz.save();
 
   res.json({ success: true, data: quiz });
-};
+});
 
-export const publishQuiz = async (req: Request, res: Response): Promise<void> => {
+export const publishQuiz = catchAsync(async (req: Request, res: Response) => {
   const quiz = await Quiz.findById(req.params.quizId);
 
   if (!quiz) {
@@ -90,9 +108,9 @@ export const publishQuiz = async (req: Request, res: Response): Promise<void> =>
   await quiz.save();
 
   res.json({ success: true, data: quiz });
-};
+});
 
-export const deleteQuiz = async (req: Request, res: Response): Promise<void> => {
+export const deleteQuiz = catchAsync(async (req: Request, res: Response) => {
   const quiz = await Quiz.findById(req.params.quizId);
 
   if (!quiz) {
@@ -108,4 +126,4 @@ export const deleteQuiz = async (req: Request, res: Response): Promise<void> => 
   await quiz.deleteOne();
 
   res.json({ success: true, message: 'Quiz deleted successfully' });
-};
+});

@@ -1,20 +1,12 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { errorHandler, notFound } from './middleware/error';
 import authRoutes from './routes/auth.routes';
 import quizRoutes from './routes/quiz.routes';
 import roomRoutes from './routes/room.routes';
 import attemptRoutes from './routes/attempt.routes';
-
-// ---------------------------------------------------------------------------
-// CORS
-// ---------------------------------------------------------------------------
-const ALLOWED_ORIGINS = [
-  process.env.CLIENT_URL ?? 'http://localhost:5173',
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5175', // accommodate Vite port shifting in dev
-];
+import { ALLOWED_ORIGINS } from './config'; // F-10: single authoritative list
 
 // ---------------------------------------------------------------------------
 // App
@@ -23,6 +15,7 @@ const app = express();
 
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json());
+app.use(cookieParser()); // required for reading httpOnly refresh token cookie (F-03)
 
 // ---------------------------------------------------------------------------
 // Routes

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Attempt } from '../models/Attempt';
 import { RoomSession } from '../models/RoomSession';
 import { Quiz, IQuestion } from '../models/Quiz';
+import { catchAsync } from '../utils/catchAsync';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -29,7 +30,11 @@ const scoreAnswer = (question: IQuestion, submittedValue: AnswerValue): boolean 
 // Controllers
 // ---------------------------------------------------------------------------
 
-export const submitAnswer = async (req: Request, res: Response): Promise<void> => {
+/**
+ * POST /attempts/:roomSessionId/answers
+ * F-11: Rejects submissions when room is not 'live'.
+ */
+export const submitAnswer = catchAsync(async (req: Request, res: Response) => {
   const { roomSessionId } = req.params;
   const { questionId, submittedValue, timeTakenMs } = req.body as {
     questionId: string;
@@ -37,17 +42,23 @@ export const submitAnswer = async (req: Request, res: Response): Promise<void> =
     timeTakenMs?: number;
   };
 
+  // F-11: Load room first and check status before accepting any answer
+  const room = await RoomSession.findById(roomSessionId);
+  if (!room) {
+    res.status(404).json({ success: false, message: 'Room not found' });
+    return;
+  }
+  if (room.status !== 'live') {
+    res.status(400).json({ success: false, message: 'Room is not currently accepting answers' });
+    return;
+  }
+
   let attempt = await Attempt.findOne({ roomSessionId, studentId: req.user!._id });
 
   if (!attempt) {
-    const room = await RoomSession.findById(roomSessionId);
-    if (!room) {
-      res.status(404).json({ success: false, message: 'Room not found' });
-      return;
-    }
     attempt = new Attempt({
       roomSessionId,
-      quizId: room.quizId,
+      quizId: room.quizId, // use the already-loaded room
       studentId: req.user!._id,
       answers: [],
       status: 'in_progress',
@@ -95,9 +106,9 @@ export const submitAnswer = async (req: Request, res: Response): Promise<void> =
   await attempt.save();
 
   res.json({ success: true, data: { isCorrect, pointsAwarded } });
-};
+});
 
-export const completeAttempt = async (req: Request, res: Response): Promise<void> => {
+export const completeAttempt = catchAsync(async (req: Request, res: Response) => {
   const { roomSessionId } = req.params;
 
   const attempt = await Attempt.findOne({ roomSessionId, studentId: req.user!._id });
@@ -111,17 +122,17 @@ export const completeAttempt = async (req: Request, res: Response): Promise<void
   await attempt.save();
 
   res.json({ success: true, data: attempt });
-};
+});
 
-export const getMyAttempts = async (req: Request, res: Response): Promise<void> => {
+export const getMyAttempts = catchAsync(async (req: Request, res: Response) => {
   const attempts = await Attempt.find({ studentId: req.user!._id }).populate(
     'quizId',
     'title description totalPoints'
   );
   res.json({ success: true, data: attempts });
-};
+});
 
-export const getAttemptById = async (req: Request, res: Response): Promise<void> => {
+export const getAttemptById = catchAsync(async (req: Request, res: Response) => {
   const attempt = await Attempt.findById(req.params.attemptId).populate('quizId');
   if (!attempt) {
     res.status(404).json({ success: false, message: 'Attempt not found' });
@@ -137,4 +148,4 @@ export const getAttemptById = async (req: Request, res: Response): Promise<void>
   }
 
   res.json({ success: true, data: attempt });
-};
+});

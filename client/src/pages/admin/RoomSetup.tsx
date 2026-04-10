@@ -5,6 +5,7 @@ import { type Socket } from 'socket.io-client';
 import io from 'socket.io-client';
 import { Copy, Play, Users, ArrowLeft, Loader2 } from 'lucide-react';
 import apiClient from '../../api/apiClient';
+import { useAuthStore } from '../../store/useAuthStore';
 import { cn } from '../../utils/cn';
 import type { Quiz, Participant, RoomSession } from '../../types';
 
@@ -58,7 +59,10 @@ export default function RoomSetup() {
         setRoomState(room);
         setParticipants(room.participants);
 
-        const socket = io(SOCKET_URL, { withCredentials: true });
+            const socket = io(SOCKET_URL, {
+          auth: { token: useAuthStore.getState().token },
+          withCredentials: true,
+        });
         socketRef.current = socket;
 
         socket.on('connect', () => {
