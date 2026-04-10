@@ -11,6 +11,10 @@ export const validate =
     });
 
     if (result.success) {
+      const data = result.data as any;
+      if (data.body) req.body = data.body;
+      if (data.query) req.query = data.query;
+      if (data.params) req.params = data.params;
       next();
       return;
     }

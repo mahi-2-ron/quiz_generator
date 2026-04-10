@@ -12,7 +12,7 @@ import { IS_PRODUCTION } from '../config';
 // ---------------------------------------------------------------------------
 
 const DEFAULT_SALT_ROUNDS = 10;
-const ACCESS_TOKEN_TTL = process.env.JWT_ACCESS_EXPIRES_IN ?? '1d';
+const ACCESS_TOKEN_TTL = process.env.JWT_ACCESS_EXPIRES_IN ?? '15m';
 const REFRESH_TOKEN_TTL_DAYS = 7;
 
 const REFRESH_COOKIE_OPTIONS = {

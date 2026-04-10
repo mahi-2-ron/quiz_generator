@@ -28,7 +28,7 @@ const router = Router();
 // Public routes with rate limiting
 router.post('/signup', authLimiter, validate(signupSchema), signup);
 router.post('/login', authLimiter, validate(loginSchema), login);
-router.post('/refresh', refreshAccessToken);
+router.post('/refresh', authLimiter, refreshAccessToken);
 router.post('/logout', logout);
 
 // Protected routes
