@@ -3,11 +3,17 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { type AxiosError } from 'axios';
 import apiClient from '../../api/apiClient';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import ConfettiBackground from '../../components/ConfettiBackground';
+import type { ApiResponse, User } from '../../types';
+
+// ---------------------------------------------------------------------------
+// Schema
+// ---------------------------------------------------------------------------
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -16,136 +22,206 @@ const signupSchema = z.object({
   role: z.enum(['admin', 'student']),
 });
 
-type SignupForm = z.infer<typeof signupSchema>;
+type SignupFormValues = z.infer<typeof signupSchema>;
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export default function Signup() {
   const [serverError, setServerError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
 
-  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<SignupForm>({
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { role: 'student' }
+    defaultValues: { role: 'student' },
   });
 
   const role = watch('role');
 
-  const onSubmit = async (data: SignupForm) => {
+  const onSubmit = async (data: SignupFormValues) => {
     setServerError('');
     try {
-      const response = await apiClient.post('/auth/signup', data);
-      setAuth(response.data.data.user, response.data.data.accessToken);
-      if (response.data.data.user.role === 'admin') navigate('/admin/dashboard');
-      else navigate('/student/profile');
-    } catch (err: any) {
-      setServerError(err.response?.data?.message || 'Failed to sign up');
+      const res = await apiClient.post<ApiResponse<{ user: User; accessToken: string }>>(
+        '/auth/signup',
+        data
+      );
+      const { user, accessToken } = res.data.data;
+      setAuth(user, accessToken);
+      navigate(user.role === 'admin' ? '/admin/dashboard' : '/student/profile', { replace: true });
+    } catch (err) {
+      const message =
+        (err as AxiosError<{ message: string }>).response?.data?.message ?? 'Failed to sign up';
+      setServerError(message);
     }
   };
 
   return (
     <div className="min-h-screen relative flex items-center justify-center py-12 px-4 overflow-hidden bg-[linear-gradient(145deg,#F8F4FF_0%,#FFF0F8_50%,#F0FAFF_100%)]">
       <ConfettiBackground />
-      
+
       <div className="w-full max-w-[480px] relative z-10 animate-slide-in">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-heading text-[var(--purple)] leading-none">
             Join Smart<span className="text-[var(--pink)]">Quiz</span>
           </h1>
-          <p className="text-[15px] text-[var(--muted)] font-bold mt-2">Start your learning adventure today! 🚀</p>
+          <p className="text-[15px] text-[var(--muted)] font-bold mt-2">
+            Start your learning adventure today! 🚀
+          </p>
         </div>
 
         <div className="bg-white rounded-[20px] shadow-[0_8px_40px_rgba(155,93,229,0.15)] p-6 sm:p-8">
+          {/* Server error */}
           {serverError && (
-            <div className="mb-4 bg-red-50 border-2 border-red-200 text-red-600 px-4 py-3 rounded-[12px] text-sm font-bold flex items-center gap-2">
-              <span>⚠️</span> {serverError}
+            <div role="alert" className="mb-4 bg-red-50 border-2 border-red-200 text-red-600 px-4 py-3 rounded-[12px] text-sm font-bold flex items-center gap-2">
+              <span aria-hidden="true">⚠️</span> {serverError}
             </div>
           )}
 
-          <div className="flex gap-4 mb-8">
-            <button 
+          {/* Role picker */}
+          <div role="group" aria-label="Select account type" className="flex gap-4 mb-8">
+            <button
               type="button"
+              aria-pressed={role === 'student'}
               onClick={() => setValue('role', 'student')}
               className={cn(
-                "flex-1 flex flex-col items-center gap-2 p-3 rounded-[15px] border-2 transition-all",
-                role === 'student' ? "border-[var(--pink)] bg-[var(--pink-l)]" : "border-[#E8E0FF] hover:border-[var(--pink)]"
+                'flex-1 flex flex-col items-center gap-2 p-3 rounded-[15px] border-2 transition-all',
+                role === 'student'
+                  ? 'border-[var(--pink)] bg-[var(--pink-l)]'
+                  : 'border-[#E8E0FF] hover:border-[var(--pink)]'
               )}
             >
-              <span className="text-2xl">🎮</span>
-              <span className={cn("text-xs font-black", role === 'student' ? "text-[var(--pink-d)]" : "text-[var(--muted)]")}>STUDENT</span>
+              <span className="text-2xl" aria-hidden="true">🎮</span>
+              <span
+                className={cn(
+                  'text-xs font-black',
+                  role === 'student' ? 'text-[var(--pink-d)]' : 'text-[var(--muted)]'
+                )}
+              >
+                STUDENT
+              </span>
             </button>
-            <button 
+            <button
               type="button"
+              aria-pressed={role === 'admin'}
               onClick={() => setValue('role', 'admin')}
               className={cn(
-                "flex-1 flex flex-col items-center gap-2 p-3 rounded-[15px] border-2 transition-all",
-                role === 'admin' ? "border-[var(--purple)] bg-[var(--purple-l)]" : "border-[#E8E0FF] hover:border-[var(--purple)]"
+                'flex-1 flex flex-col items-center gap-2 p-3 rounded-[15px] border-2 transition-all',
+                role === 'admin'
+                  ? 'border-[var(--purple)] bg-[var(--purple-l)]'
+                  : 'border-[#E8E0FF] hover:border-[var(--purple)]'
               )}
             >
-              <span className="text-2xl">🎓</span>
-              <span className={cn("text-xs font-black", role === 'admin' ? "text-[var(--purple-d)]" : "text-[var(--muted)]")}>TEACHER</span>
+              <span className="text-2xl" aria-hidden="true">🎓</span>
+              <span
+                className={cn(
+                  'text-xs font-black',
+                  role === 'admin' ? 'text-[var(--purple-d)]' : 'text-[var(--muted)]'
+                )}
+              >
+                TEACHER
+              </span>
             </button>
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
+            {/* Name */}
             <div className="input-group">
-              <label className="label">Full Name ✨</label>
-              <div className="relative">
-                <input
-                  {...register('name')}
-                  placeholder="John Doe"
-                  className={cn("input", errors.name && "border-red-400")}
-                />
-              </div>
-              {errors.name && <p className="mt-1 text-xs text-red-500 font-bold ml-1">{errors.name.message}</p>}
+              <label htmlFor="signup-name" className="label">Full Name ✨</label>
+              <input
+                id="signup-name"
+                {...register('name')}
+                autoComplete="name"
+                placeholder="John Doe"
+                aria-invalid={!!errors.name}
+                aria-describedby={errors.name ? 'signup-name-error' : undefined}
+                className={cn('input', errors.name && 'border-red-400')}
+              />
+              {errors.name && (
+                <p id="signup-name-error" role="alert" className="mt-1 text-xs text-red-500 font-bold ml-1">
+                  {errors.name.message}
+                </p>
+              )}
             </div>
 
+            {/* Email */}
             <div className="input-group">
-              <label className="label">Email Address 📧</label>
+              <label htmlFor="signup-email" className="label">Email Address 📧</label>
               <input
+                id="signup-email"
                 {...register('email')}
                 type="email"
+                autoComplete="email"
                 placeholder="your@email.com"
-                className={cn("input", errors.email && "border-red-400")}
+                aria-invalid={!!errors.email}
+                aria-describedby={errors.email ? 'signup-email-error' : undefined}
+                className={cn('input', errors.email && 'border-red-400')}
               />
-              {errors.email && <p className="mt-1 text-xs text-red-500 font-bold ml-1">{errors.email.message}</p>}
+              {errors.email && (
+                <p id="signup-email-error" role="alert" className="mt-1 text-xs text-red-500 font-bold ml-1">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
+            {/* Password */}
             <div className="input-group">
-              <label className="label">Password 🔒</label>
+              <label htmlFor="signup-password" className="label">Password 🔒</label>
               <div className="relative">
                 <input
+                  id="signup-password"
                   {...register('password')}
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
                   placeholder="Min 8 characters"
-                  className={cn("input pr-12", errors.password && "border-red-400")}
+                  aria-invalid={!!errors.password}
+                  aria-describedby={errors.password ? 'signup-password-error' : undefined}
+                  className={cn('input pr-12', errors.password && 'border-red-400')}
                 />
-                <button 
+                <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-[var(--muted)] hover:text-[var(--purple)] transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              {errors.password && <p className="mt-1 text-xs text-red-500 font-bold ml-1">{errors.password.message}</p>}
+              {errors.password && (
+                <p id="signup-password-error" role="alert" className="mt-1 text-xs text-red-500 font-bold ml-1">
+                  {errors.password.message}
+                </p>
+              )}
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className={cn(
-                "w-full btn mt-2",
-                role === 'admin' ? "btn-p" : "btn-pk"
-              )}
+              className={cn('w-full btn mt-2', role === 'admin' ? 'btn-p' : 'btn-pk')}
             >
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "✨ Create My Account"}
+              {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                '✨ Create My Account'
+              )}
             </button>
           </form>
 
           <div className="text-center mt-6 text-sm">
             <span className="text-[var(--muted)] font-bold">Already have an account? </span>
-            <Link to="/login" className="font-black text-[var(--purple)] hover:text-[var(--purple-d)] underline decoration-2 underline-offset-4">
+            <Link
+              to="/login"
+              className="font-black text-[var(--purple)] hover:text-[var(--purple-d)] underline decoration-2 underline-offset-4"
+            >
               Sign in
             </Link>
           </div>

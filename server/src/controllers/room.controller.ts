@@ -2,23 +2,31 @@ import { Request, Response } from 'express';
 import { RoomSession } from '../models/RoomSession';
 import { Quiz } from '../models/Quiz';
 
-export const createRoom = async (req: any, res: Response) => {
-  const { quizId, mode } = req.body;
+// ---------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------
+const generateRoomCode = (): string =>
+  Math.random().toString(36).substring(2, 8).toUpperCase();
+
+// ---------------------------------------------------------------------------
+// Controllers
+// ---------------------------------------------------------------------------
+
+export const createRoom = async (req: Request, res: Response): Promise<void> => {
+  const { quizId, mode } = req.body as { quizId: string; mode?: string };
 
   const quiz = await Quiz.findById(quizId);
   if (!quiz || quiz.status !== 'published') {
-    res.status(400).json({ success: false, message: 'Invalid or unpublished quiz' });
+    res.status(400).json({ success: false, message: 'Quiz not found or is not published' });
     return;
   }
 
-  // Generate a random 6 character code
-  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-
+  const code = generateRoomCode();
   const room = await RoomSession.create({
     code,
     quizId,
     hostId: req.user!._id,
-    mode: mode || 'score',
+    mode: mode ?? 'score',
     status: 'lobby',
     participants: [],
   });
@@ -26,8 +34,11 @@ export const createRoom = async (req: any, res: Response) => {
   res.status(201).json({ success: true, data: room });
 };
 
-export const getRoomByCode = async (req: any, res: Response) => {
-  const room = await RoomSession.findOne({ code: req.params.code }).populate('quizId', 'title description totalPoints');
+export const getRoomByCode = async (req: Request, res: Response): Promise<void> => {
+  const room = await RoomSession.findOne({ code: req.params.code }).populate(
+    'quizId',
+    'title description totalPoints'
+  );
 
   if (!room) {
     res.status(404).json({ success: false, message: 'Room not found' });
@@ -37,8 +48,7 @@ export const getRoomByCode = async (req: any, res: Response) => {
   res.json({ success: true, data: room });
 };
 
-export const joinRoom = async (req: any, res: Response) => {
-  // Usually this runs from a student trying to enter the lobby
+export const joinRoom = async (req: Request, res: Response): Promise<void> => {
   const room = await RoomSession.findOne({ code: req.params.code });
 
   if (!room) {
@@ -51,8 +61,11 @@ export const joinRoom = async (req: any, res: Response) => {
     return;
   }
 
-  const existingParticipant = room.participants.find(p => p.userId.toString() === req.user!._id.toString());
-  if (!existingParticipant) {
+  const alreadyJoined = room.participants.some(
+    (p) => p.userId.toString() === req.user!._id.toString()
+  );
+
+  if (!alreadyJoined) {
     room.participants.push({
       userId: req.user!._id,
       name: req.user!.name,
@@ -66,7 +79,7 @@ export const joinRoom = async (req: any, res: Response) => {
   res.json({ success: true, data: room });
 };
 
-export const updateRoomStatus = async (req: any, res: Response) => {
+export const updateRoomStatus = async (req: Request, res: Response): Promise<void> => {
   const room = await RoomSession.findById(req.params.roomId);
 
   if (!room) {
@@ -75,11 +88,12 @@ export const updateRoomStatus = async (req: any, res: Response) => {
   }
 
   if (room.hostId.toString() !== req.user!._id.toString()) {
-    res.status(403).json({ success: false, message: 'Not authorized' });
+    res.status(403).json({ success: false, message: 'Not authorized — host only' });
     return;
   }
 
-  const { status } = req.body;
+  const { status } = req.body as { status: string };
+
   if (status === 'live' && room.status === 'lobby') {
     room.status = 'live';
     room.startedAt = new Date();
@@ -87,7 +101,7 @@ export const updateRoomStatus = async (req: any, res: Response) => {
     room.status = status;
     room.endedAt = new Date();
   }
-  
+
   await room.save();
   res.json({ success: true, data: room });
 };
